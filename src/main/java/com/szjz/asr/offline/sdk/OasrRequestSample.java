@@ -11,6 +11,7 @@ import com.tencent.cloud.asr.realtime.sdk.model.enums.EngineModelType;
 import com.tencent.cloud.asr.realtime.sdk.model.enums.VoiceFormat;
 import com.tencent.cloud.asr.realtime.sdk.utils.ByteUtils;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.StringUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -41,14 +42,28 @@ import java.util.*;
  * @author iantang
  * @version 1.0
  */
+
 public class OasrRequestSample {
 
 
     private static final String HMAC_SHA1_ALGORITHM = "HmacSHA1";
+    private final static String CHARSET = "UTF-8";
+    private static final String APPID = "1300494328";
+    private static final String SECRETID = "AKID4vwf7KQyQnu9qM9gTzGI5f9PP9csMa6V";
+    private static final String SECRETKEY = "JM9gy0wiUv74oLbcQ8bsqY2MQH4dx1oM";
+    private static final String DOMAIN = "https://asr.tencentcloudapi.com/?";
+    private static final int NONCE = new Random().nextInt(Integer.MAX_VALUE);
+    private static final Long TIMESTAMP = System.currentTimeMillis() / 1000;
+//    private static final String TESTURL = "https://ruskin-1256085166.cos.ap-guangzhou.myqcloud.com/test.wav";
+//    private static final String TESTURL = "http://www.luyin.com/upload/zhongyingwenkejian003.mp3";
+//    private static final String TESTURL = "http://www.luyin.com/upload/yingwennvtong0408009j.mp3";
+//    private static final String TESTURL = "http://www.luyin.com/upload/yingwenyuyin0122012.mp3";
+    //中文
+    private static final String TESTURL = "http://www.luyin.com/upload/zhuanyeweixiu0927088j.mp3";
+
 
     private OasrRequesterSender oasrRequesterSender = new OasrRequesterSender();
 
-    private static ObjectMapper mapper = new ObjectMapper();
     static {
         initBaseParameters();
     }
@@ -56,10 +71,6 @@ public class OasrRequestSample {
     public static void main(String[] args) {
         OasrRequestSample rasrRequestSample = new OasrRequestSample();
         rasrRequestSample.start();
-//        String  key = "Gu5t9xGARNpq86cd98joQYCN3EXAMPLE";
-//        String str = "GETcvm.tencentcloudapi.com/?Action=DescribeInstances&InstanceIds.0=ins-09dx96dg&Limit=20&Nonce=11886&Offset=0&Region=ap-guangzhou&SecretId=AKIDz8krbsJ5yKBZQpn74WFkmLPx3EXAMPLE&Timestamp=1465185768&Version=2017-03-12";
-//        String hmac = genHMAC(str, key);
-//        System.err.println("hamc:"+hmac);
     }
 
     private void start() {
@@ -68,7 +79,6 @@ public class OasrRequestSample {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        // this.sendBytesRequest();
         System.exit(0);
     }
 
@@ -76,65 +86,76 @@ public class OasrRequestSample {
      * 指定语音文件的Url，发出请求。建议使用此方法。
      */
     private void sendUrlRequest() throws Exception {
-
-//        String taskUrl = "https://asr.tencentcloudapi.com/?Action=CreateRecTask" +
-//                "&ChannelNum=1" +
-//                "&EngineModelType=8k_0" +
-//                "&ResTextFormat=0" +
-//                "&SourceType=0" +
-//                "&Version=2019-06-14" +
-//                "&Nonce="+new Random().nextInt(Integer.MAX_VALUE)+
-//                "&Timestamp="+ System.currentTimeMillis() / 1000+
-//                "&SecretId=AKID4vwf7KQyQnu9qM9gTzGI5f9PP9csMa6V"+
-//                "&Url=https%3a%2f%2fruskin-1256085166.cos.ap-guangzhou.myqcloud.com%2ftest.wav";
-        TreeMap<String, Object> treeMap = new TreeMap<String, Object>(); // TreeMap可以自动排序
-        // 实际调用时应当使用随机数，例如：
-        treeMap.put("Nonce", new Random().nextInt(Integer.MAX_VALUE));// 公共参数
-        // 实际调用时应当使用系统当前时间，例如：
-        treeMap.put("Timestamp", System.currentTimeMillis() / 1000);
-        treeMap.put("ChannelNum",1);
-        treeMap.put("EngineModelType","8k_0");
-        treeMap.put("ResTextFormat","0");
-        treeMap.put("SourceType","0");
-        treeMap.put("Url","https://ruskin-1256085166.cos.ap-guangzhou.myqcloud.com/test.wav");
-        treeMap.put("SecretId", "AKID4vwf7KQyQnu9qM9gTzGI5f9PP9csMa6V"); // 公共参数
-        treeMap.put("Action", "CreateRecTask"); // 公共参数
-        treeMap.put("Version", "2019-06-14"); // 公共参数
-        treeMap.put("Region", "ap-guangzhou"); // 公共参数
-        treeMap.put("Signature", sign(getStringToSign(treeMap), "JM9gy0wiUv74oLbcQ8bsqY2MQH4dx1oM", "HmacSHA1")); // 公共参数
-        String taskUrl = getUrl(treeMap);
-        System.out.println("taskUrl:"+taskUrl);
-        String[] taskSplit = taskUrl.split("\\?");
-        String  json = sendGET(taskSplit[0], taskSplit[1]);
-
-        Task task = mapper.readValue(json, Task.class);
-        System.err.println("response:" + task.getResponse().getData().getTaskId());
-
-
+        String taskId = null;
+        while (true) {
+            taskId = getTaskId();
+            if (taskId != null) {
+                break;
+            }
+        }
 
         TreeMap<String, Object> params = new TreeMap<String, Object>(); // TreeMap可以自动排序
         // 实际调用时应当使用随机数，例如：
-        params.put("Nonce", new Random().nextInt(Integer.MAX_VALUE));// 公共参数
+        params.put("Nonce", NONCE);// 公共参数
         // 实际调用时应当使用系统当前时间，例如：
-        params.put("Timestamp", System.currentTimeMillis() / 1000);
-        params.put("SecretId", "AKID4vwf7KQyQnu9qM9gTzGI5f9PP9csMa6V"); // 公共参数
+        params.put("Timestamp", TIMESTAMP);
+        params.put("SecretId", SECRETID); // 公共参数
         params.put("Action", "DescribeTaskStatus"); // 公共参数
         params.put("Version", "2019-06-14"); // 公共参数
         params.put("Region", "ap-guangzhou"); // 公共参数
-        params.put("TaskId", "1396667"); // 业务参数
-        params.put("Signature", sign(getStringToSign(params), "JM9gy0wiUv74oLbcQ8bsqY2MQH4dx1oM", "HmacSHA1")); // 公共参数
+        params.put("TaskId", taskId); // 业务参数
+        params.put("Signature", sign(getStringToSign(params), SECRETKEY, HMAC_SHA1_ALGORITHM)); // 公共参数
         String url = getUrl(params);
         System.out.println(url);
 
-        OasrBytesRequest oasrBytesRequest = new OasrBytesRequest(
-                url,
-                "https://xuhai2-1255824371.cos.ap-chengdu.myqcloud.com/test.wav");
+        OasrBytesRequest oasrBytesRequest = new OasrBytesRequest(url, TESTURL);
         oasrBytesRequest.setChannelNum(2); //设置为2声道语音，默认为1声道。目前仅8K语音支持2声道。
         OasrResponse oasrResponse = this.oasrRequesterSender.send(oasrBytesRequest);
         this.printReponse(oasrResponse);
         String[] split = url.split("\\?");
-        String taskResponse = sendGET(split[0], split[1]);
+        String taskResponse = null;
+
+       // {"Response":{"RequestId":"827b0029-8c7c-42af-83ca-b42c32112c17","Data":{"TaskId":565804952,"Status":1,"StatusStr":"doing","Result":"","ErrorMsg":""}}}
+        while (true) {
+            taskResponse = sendGET(split[0], split[1]);
+            Thread.sleep(1000);
+            String statusStr = taskResponse.split("\"StatusStr\":\"")[1].split("\",\"Result\"")[0];
+            System.err.println(taskResponse);
+            if (taskResponse != null && statusStr.equals("success")) {
+                break;
+            }
+        }
         System.err.println(taskResponse);
+    }
+
+    /**
+     * 获取taskID
+     */
+    public String getTaskId() throws Exception {
+        TreeMap<String, Object> treeMap = new TreeMap<String, Object>(); // TreeMap可以自动排序
+        // 实际调用时应当使用随机数，例如：
+        treeMap.put("Nonce", NONCE);// 公共参数
+        // 实际调用时应当使用系统当前时间，例如：
+        treeMap.put("Timestamp", TIMESTAMP);
+        treeMap.put("ChannelNum", 1);
+        treeMap.put("EngineModelType", "8k_0");
+        treeMap.put("ResTextFormat", "0");
+        treeMap.put("SourceType", "0");
+        treeMap.put("Url", TESTURL);
+        treeMap.put("SecretId", SECRETID); // 公共参数
+        treeMap.put("Action", "CreateRecTask"); // 公共参数
+        treeMap.put("Version", "2019-06-14"); // 公共参数
+        treeMap.put("Region", "ap-guangzhou"); // 公共参数
+        treeMap.put("Signature", sign(getStringToSign(treeMap), SECRETKEY, HMAC_SHA1_ALGORITHM)); // 公共参数
+        String taskUrl = getUrl(treeMap);
+        System.out.println("taskUrl:" + taskUrl);
+        String[] taskSplit = taskUrl.split("\\?");
+        String json = sendGET(taskSplit[0], taskSplit[1]);
+        String taskId = json.split("\"TaskId\":")[1].split("}")[0];
+        System.err.println("response:" + json);
+        System.err.println("taskId:" + taskId);
+
+        return taskId;
     }
 
     /**
@@ -162,9 +183,9 @@ public class OasrRequestSample {
      */
     private static void initBaseParameters() {
         // required, 必须配置
-        AsrBaseConfig.appId = "1300494328";
-        AsrBaseConfig.secretId = "AKID4vwf7KQyQnu9qM9gTzGI5f9PP9csMa6V";
-        AsrBaseConfig.secretKey = "JM9gy0wiUv74oLbcQ8bsqY2MQH4dx1oM";
+        AsrBaseConfig.appId = APPID;
+        AsrBaseConfig.secretId = SECRETID;
+        AsrBaseConfig.secretKey = SECRETKEY;
         AsrInternalConfig.SUB_SERVICE_TYPE = 0; // 0表示离线识别
 
         // optional，根据自身需求配置值
@@ -195,49 +216,15 @@ public class OasrRequestSample {
         return s2s.toString().substring(0, s2s.length() - 1);
     }
 
-    private final static String CHARSET = "UTF-8";
 
     public static String getUrl(TreeMap<String, Object> params) throws UnsupportedEncodingException {
-        StringBuilder url = new StringBuilder("https://asr.tencentcloudapi.com/?");
+        StringBuilder url = new StringBuilder(DOMAIN);
         // 实际请求的url中对参数顺序没有要求
         for (String k : params.keySet()) {
             // 需要对请求串进行urlencode，由于key都是英文字母，故此处仅对其value进行urlencode
             url.append(k).append("=").append(URLEncoder.encode(params.get(k).toString(), CHARSET)).append("&");
         }
         return url.toString().substring(0, url.length() - 1);
-    }
-
-
-    /**
-     * 使用 HMAC-SHA1 签名方法对data进行签名
-     *
-     * @param data 被签名的字符串
-     * @param key  密钥
-     * @return 加密后的字符串
-     */
-    public static String genHMAC(String data, String key) {
-        byte[] result = null;
-        try {
-            //根据给定的字节数组构造一个密钥,第二参数指定一个密钥算法的名称
-            SecretKeySpec signinKey = new SecretKeySpec(key.getBytes(), HMAC_SHA1_ALGORITHM);
-            //生成一个指定 Mac 算法 的 Mac 对象
-            Mac mac = Mac.getInstance(HMAC_SHA1_ALGORITHM);
-            //用给定密钥初始化 Mac 对象
-            mac.init(signinKey);
-            //完成 Mac 操作
-            byte[] rawHmac = mac.doFinal(data.getBytes());
-            result = Base64.encodeBase64(rawHmac);
-
-        } catch (NoSuchAlgorithmException e) {
-            System.err.println(e.getMessage());
-        } catch (InvalidKeyException e) {
-            System.err.println(e.getMessage());
-        }
-        if (null != result) {
-            return new String(result);
-        } else {
-            return null;
-        }
     }
 
 
@@ -257,11 +244,11 @@ public class OasrRequestSample {
             //建立连接
             connection.connect();
             // 获取所有响应头字段
-            Map<String, List<String>> map = connection.getHeaderFields();
+//            Map<String, List<String>> map = connection.getHeaderFields();
             // 遍历所有的响应头字段，获取到cookies等
-            for (String key : map.keySet()) {
-                System.out.println(key + "--->" + map.get(key));
-            }
+//            for (String key : map.keySet()) {
+//                System.out.println(key + "--->" + map.get(key));
+//            }
             // 定义 BufferedReader输入流来读取URL的响应
             read = new BufferedReader(new InputStreamReader(
                     connection.getInputStream(), "UTF-8"));
