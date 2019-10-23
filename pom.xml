@@ -9,9 +9,9 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.szjz</groupId>
-    <artifactId>asr</artifactId>
+    <artifactId>tencen-asr</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>asr</name>
+    <name>tencen-asr</name>
     <description>Demo project for Spring Boot</description>
 
     <properties>
@@ -52,14 +52,15 @@
         </dependency>
 
         <dependency>
-            <groupId>com.qcloud</groupId>
-            <artifactId>qcloud-java-sdk</artifactId>
-            <version>2.0.6</version>
-        </dependency>
-        <dependency>
             <groupId>com.tencentcloudapi</groupId>
             <artifactId>tencentcloud-sdk-java</artifactId>
             <version>3.0.98</version><!-- 注：这里只是示例版本号，请到 https://mvnrepository.com/artifact/com.tencentcloudapi/tencentcloud-sdk-java 获取最新版本号 -->
+        </dependency>
+
+        <dependency>
+            <groupId>com.github.dadiyang</groupId>
+            <artifactId>jave</artifactId>
+            <version>1.0.4</version>
         </dependency>
 
         <dependency>

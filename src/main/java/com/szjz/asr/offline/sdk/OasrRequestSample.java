@@ -10,6 +10,8 @@ import com.tencent.cloud.asr.realtime.sdk.config.AsrPersonalConfig;
 import com.tencent.cloud.asr.realtime.sdk.model.enums.EngineModelType;
 import com.tencent.cloud.asr.realtime.sdk.model.enums.VoiceFormat;
 import com.tencent.cloud.asr.realtime.sdk.utils.ByteUtils;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.StringUtils;
 
@@ -42,7 +44,7 @@ import java.util.*;
  * @author iantang
  * @version 1.0
  */
-
+@Slf4j
 public class OasrRequestSample {
 
 
@@ -54,12 +56,17 @@ public class OasrRequestSample {
     private static final String DOMAIN = "https://asr.tencentcloudapi.com/?";
     private static final int NONCE = new Random().nextInt(Integer.MAX_VALUE);
     private static final Long TIMESTAMP = System.currentTimeMillis() / 1000;
+    //腾讯本身的中文测试语音
 //    private static final String TESTURL = "https://ruskin-1256085166.cos.ap-guangzhou.myqcloud.com/test.wav";
+    //其他网站测试语音
+    //中英混合
 //    private static final String TESTURL = "http://www.luyin.com/upload/zhongyingwenkejian003.mp3";
-//    private static final String TESTURL = "http://www.luyin.com/upload/yingwennvtong0408009j.mp3";
+    //英文单词
+    private static final String TESTURL = "http://www.luyin.com/upload/yingwennvtong0408009j.mp3";
+    //英文语句
 //    private static final String TESTURL = "http://www.luyin.com/upload/yingwenyuyin0122012.mp3";
     //中文
-    private static final String TESTURL = "http://www.luyin.com/upload/zhuanyeweixiu0927088j.mp3";
+//    private static final String TESTURL = "http://www.luyin.com/upload/zhuanyeweixiu0927088j.mp3";
 
 
     private OasrRequesterSender oasrRequesterSender = new OasrRequesterSender();
@@ -74,18 +81,16 @@ public class OasrRequestSample {
     }
 
     private void start() {
-        try {
-            this.sendUrlRequest();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+
+//            this.sendUrlRequest();
+        this.sendBytesRequest();
         System.exit(0);
     }
 
     /**
      * 指定语音文件的Url，发出请求。建议使用此方法。
      */
-    private void sendUrlRequest() throws Exception {
+    private void sendUrlRequest() {
         String taskId = null;
         while (true) {
             taskId = getTaskId();
@@ -94,6 +99,61 @@ public class OasrRequestSample {
             }
         }
 
+        String callbackUrl = genCallbackUrl(taskId);
+
+        OasrBytesRequest oasrBytesRequest = new OasrBytesRequest(callbackUrl, TESTURL);
+        oasrBytesRequest.setChannelNum(2); //设置为2声道语音，默认为1声道。目前仅8K语音支持2声道。
+        OasrResponse oasrResponse = this.oasrRequesterSender.send(oasrBytesRequest);
+        this.printReponse(oasrResponse);
+
+        getResult(callbackUrl);
+    }
+
+
+    /**
+     * 从文件中读取语音数据，通过HttpBody发出请求。语音文件大小需小于5兆才可使用此方法。
+     */
+    private void sendBytesRequest() {
+        String callbackUrl = genCallbackUrl(getTaskId());
+        byte[] content = ByteUtils.inputStream2ByteArray("E:\\tencen-asr\\test01.mp3");
+        OasrBytesRequest oasrBytesRequest = new OasrBytesRequest(callbackUrl, content);
+        // oasrBytesRequest.setChannelNum(2); //特别设置为2声道，默认为1声道。目前仅8K语音支持2声道。
+        OasrResponse oasrResponse = this.oasrRequesterSender.send(oasrBytesRequest);
+        this.printReponse(oasrResponse);
+
+        getResult(callbackUrl);
+    }
+
+
+    /**
+     * 轮询回调接口 查询结果
+     */
+    public void getResult(String callbackUrl) {
+        if (callbackUrl != null) {
+            String[] split = callbackUrl.split("\\?");
+            String taskResponse = null;
+
+            // {"Response":{"RequestId":"827b0029-8c7c-42af-83ca-b42c32112c17","Data":{"TaskId":565804952,"Status":1,"StatusStr":"doing","Result":"","ErrorMsg":""}}}
+            while (true) {
+                taskResponse = sendGET(split[0], split[1]);
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                String statusStr = taskResponse.split("\"StatusStr\":\"")[1].split("\",\"Result\"")[0];
+                log.debug("result:{}", taskResponse);
+                if (taskResponse != null && statusStr.equals("success")) {
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * 生成回调URL 用于获取识别结果
+     */
+    public String genCallbackUrl(String taskId) {
         TreeMap<String, Object> params = new TreeMap<String, Object>(); // TreeMap可以自动排序
         // 实际调用时应当使用随机数，例如：
         params.put("Nonce", NONCE);// 公共参数
@@ -102,36 +162,23 @@ public class OasrRequestSample {
         params.put("SecretId", SECRETID); // 公共参数
         params.put("Action", "DescribeTaskStatus"); // 公共参数
         params.put("Version", "2019-06-14"); // 公共参数
-        params.put("Region", "ap-guangzhou"); // 公共参数
+//        params.put("Region", "ap-guangzhou"); // 公共参数
         params.put("TaskId", taskId); // 业务参数
-        params.put("Signature", sign(getStringToSign(params), SECRETKEY, HMAC_SHA1_ALGORITHM)); // 公共参数
-        String url = getUrl(params);
-        System.out.println(url);
-
-        OasrBytesRequest oasrBytesRequest = new OasrBytesRequest(url, TESTURL);
-        oasrBytesRequest.setChannelNum(2); //设置为2声道语音，默认为1声道。目前仅8K语音支持2声道。
-        OasrResponse oasrResponse = this.oasrRequesterSender.send(oasrBytesRequest);
-        this.printReponse(oasrResponse);
-        String[] split = url.split("\\?");
-        String taskResponse = null;
-
-       // {"Response":{"RequestId":"827b0029-8c7c-42af-83ca-b42c32112c17","Data":{"TaskId":565804952,"Status":1,"StatusStr":"doing","Result":"","ErrorMsg":""}}}
-        while (true) {
-            taskResponse = sendGET(split[0], split[1]);
-            Thread.sleep(1000);
-            String statusStr = taskResponse.split("\"StatusStr\":\"")[1].split("\",\"Result\"")[0];
-            System.err.println(taskResponse);
-            if (taskResponse != null && statusStr.equals("success")) {
-                break;
-            }
+        String url = null;
+        try {
+            params.put("Signature", sign(getStringToSign(params), SECRETKEY, HMAC_SHA1_ALGORITHM)); // 公共参数
+            url = getUrl(params);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        System.err.println(taskResponse);
+        log.debug("CallbackUrl:{}", url);
+        return url;
     }
 
     /**
      * 获取taskID
      */
-    public String getTaskId() throws Exception {
+    public String getTaskId() {
         TreeMap<String, Object> treeMap = new TreeMap<String, Object>(); // TreeMap可以自动排序
         // 实际调用时应当使用随机数，例如：
         treeMap.put("Nonce", NONCE);// 公共参数
@@ -140,34 +187,31 @@ public class OasrRequestSample {
         treeMap.put("ChannelNum", 1);
         treeMap.put("EngineModelType", "8k_0");
         treeMap.put("ResTextFormat", "0");
-        treeMap.put("SourceType", "0");
+        treeMap.put("SourceType", "0");//0:语音url or 1:语音数据bodydata
         treeMap.put("Url", TESTURL);
         treeMap.put("SecretId", SECRETID); // 公共参数
         treeMap.put("Action", "CreateRecTask"); // 公共参数
         treeMap.put("Version", "2019-06-14"); // 公共参数
         treeMap.put("Region", "ap-guangzhou"); // 公共参数
-        treeMap.put("Signature", sign(getStringToSign(treeMap), SECRETKEY, HMAC_SHA1_ALGORITHM)); // 公共参数
-        String taskUrl = getUrl(treeMap);
+        String taskUrl = null;
+        try {
+            treeMap.put("Signature", sign(getStringToSign(treeMap), SECRETKEY, HMAC_SHA1_ALGORITHM)); // 公共参数
+            taskUrl = getUrl(treeMap);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         System.out.println("taskUrl:" + taskUrl);
         String[] taskSplit = taskUrl.split("\\?");
         String json = sendGET(taskSplit[0], taskSplit[1]);
-        String taskId = json.split("\"TaskId\":")[1].split("}")[0];
-        System.err.println("response:" + json);
-        System.err.println("taskId:" + taskId);
-
-        return taskId;
+        if (json.contains("\"TaskId\":")) {
+            String taskId = json.split("\"TaskId\":")[1].split("}")[0];
+            System.err.println("response:" + json);
+            System.err.println("taskId:" + taskId);
+            return taskId;
+        }
+        return null;
     }
 
-    /**
-     * 从文件中读取语音数据，通过HttpBody发出请求。语音文件大小需小于5兆才可使用此方法。
-     */
-    private void sendBytesRequest() {
-        byte[] content = ByteUtils.inputStream2ByteArray("test_wav/8k/8k.wav");
-        OasrBytesRequest oasrBytesRequest = new OasrBytesRequest("http://xxx.xx.xxx", content);
-        // oasrBytesRequest.setChannelNum(2); //特别设置为2声道，默认为1声道。目前仅8K语音支持2声道。
-        OasrResponse oasrResponse = this.oasrRequesterSender.send(oasrBytesRequest);
-        this.printReponse(oasrResponse);
-    }
 
     private void printReponse(OasrResponse oasrResponse) {
         if (oasrResponse != null)
@@ -189,7 +233,7 @@ public class OasrRequestSample {
         AsrInternalConfig.SUB_SERVICE_TYPE = 0; // 0表示离线识别
 
         // optional，根据自身需求配置值
-        AsrPersonalConfig.engineModelType = EngineModelType._8k_0;
+        AsrPersonalConfig.engineModelType = EngineModelType._16k_0;
         AsrPersonalConfig.voiceFormat = VoiceFormat.wav;
 
         // optional 可忽略
